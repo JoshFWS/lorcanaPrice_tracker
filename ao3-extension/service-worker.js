@@ -274,9 +274,8 @@ function openBackgroundTab(url, expectedType) {
       const timeout = setTimeout(() => {
         console.warn(`Tab ${tabId} timed out for ${expectedType}`);
         pendingRequests.delete(tabId);
-        chrome.tabs.remove(tabId).catch(() => {});
 
-        // Try executeScript as fallback
+        // Try executeScript as fallback (it handles tab cleanup on success/failure)
         tryFallbackScript(tabId, expectedType, resolve);
       }, 15000);
 
