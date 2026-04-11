@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Lorcana Price Tracker</h1>
+
+    <div class="status" id="status">
+      <span id="statusText">Loading...</span>
+    </div>
+
+    <section>
+      <h2>Discord Webhook</h2>
+      <input type="text" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." />
+    </section>
+
+    <section>
+      <h2>Schedule</h2>
+      <div class="row">
+        <input type="time" id="time1" value="09:00" />
+        <input type="time" id="time2" value="21:00" />
+      </div>
+    </section>
+
+    <section>
+      <h2>Products</h2>
+      <div id="productList"></div>
+      <button id="addProduct" class="btn-secondary">+ Add Product</button>
+    </section>
+
+    <div class="actions">
+      <button id="save" class="btn-primary">Save</button>
+      <button id="runNow" class="btn-primary">Run Now</button>
+    </div>
+
+    <div id="message" class="message hidden"></div>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
