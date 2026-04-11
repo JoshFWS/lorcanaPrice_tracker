@@ -9,7 +9,7 @@ schedule:
 # Helps avoid IP blocks from frequent automated searches.
 paranoid_mode:
   enabled: false               # Set to true to enable
-  checks_per_hour: 1           # 1-12 checks per hour (times are randomized)
+  checks_per_hour: 5           # 1-12 checks per hour (times are randomized)
 
 bot_name: "Lorcana Price Tracker"
 

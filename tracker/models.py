@@ -25,7 +25,7 @@ class AppConfig:
     schedule_timezone: str
     products: list[ProductConfig]
     paranoid_mode: bool = False
-    checks_per_hour: int = 1
+    checks_per_hour: int = 5
 
 
 @dataclass

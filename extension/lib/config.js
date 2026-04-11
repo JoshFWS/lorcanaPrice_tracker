@@ -5,7 +5,7 @@ const DEFAULT_CONFIG = {
   categoryId: 71,
   scheduleTimes: ["09:00", "21:00"],
   paranoidMode: false,
-  checksPerHour: 1,
+  checksPerHour: 5,
   products: [
     {
       name: "Wilds Unknown Booster Box (Pre-Order)",

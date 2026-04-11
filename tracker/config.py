@@ -70,7 +70,7 @@ def load_config() -> AppConfig:
         schedule_timezone=schedule.get("timezone", "US/Eastern"),
         products=products,
         paranoid_mode=paranoid.get("enabled", False),
-        checks_per_hour=paranoid.get("checks_per_hour", 1),
+        checks_per_hour=paranoid.get("checks_per_hour", 5),
     )
 
 
