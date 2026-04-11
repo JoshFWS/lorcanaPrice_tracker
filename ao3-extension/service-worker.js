@@ -64,8 +64,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (pending) {
       pending.resolve(message.data);
       pendingRequests.delete(sender.tab.id);
+      // Only remove the tab if we owned the pending request.
+      // If the timeout already fired, the fallback handler owns tab cleanup.
+      chrome.tabs.remove(sender.tab.id).catch(() => {});
     }
-    chrome.tabs.remove(sender.tab.id).catch(() => {});
   }
 });
 
