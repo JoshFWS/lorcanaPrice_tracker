@@ -60,6 +60,8 @@ def load_config() -> AppConfig:
             alert_threshold_pct=p.get("alert_threshold_pct", 0.80),
         ))
 
+    paranoid = raw.get("paranoid_mode", {})
+
     return AppConfig(
         webhook_url=webhook_url,
         bot_name=raw.get("bot_name", "Lorcana Price Tracker"),
@@ -67,6 +69,8 @@ def load_config() -> AppConfig:
         schedule_times=schedule.get("times", ["09:00", "21:00"]),
         schedule_timezone=schedule.get("timezone", "US/Eastern"),
         products=products,
+        paranoid_mode=paranoid.get("enabled", False),
+        checks_per_hour=paranoid.get("checks_per_hour", 5),
     )
 
 

@@ -4,6 +4,8 @@ const DEFAULT_CONFIG = {
   botName: "Lorcana Price Tracker",
   categoryId: 71,
   scheduleTimes: ["09:00", "21:00"],
+  paranoidMode: false,
+  checksPerHour: 5,
   products: [
     {
       name: "Wilds Unknown Booster Box (Pre-Order)",
@@ -37,6 +39,15 @@ export async function getLastRun() {
 
 export async function setLastRun(timestamp) {
   await chrome.storage.local.set({ lastRun: timestamp });
+}
+
+export async function getLastPrices() {
+  const data = await chrome.storage.local.get("lastPrices");
+  return data.lastPrices || null;
+}
+
+export async function setLastPrices(prices) {
+  await chrome.storage.local.set({ lastPrices: prices });
 }
 
 export { DEFAULT_CONFIG };

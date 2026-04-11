@@ -1,6 +1,7 @@
-import { loadConfig, setLastRun } from "./lib/config.js";
+import { loadConfig, setLastRun, getLastPrices, setLastPrices } from "./lib/config.js";
 import { getPrice } from "./lib/tcgcsv.js";
 import { sendReports, formatMessage } from "./lib/discord.js";
+import { detectProductType, isResultRelevant, isPriceReasonable } from "./lib/product-types.js";
 
 // --- Alarm Setup ---
 
@@ -17,31 +18,57 @@ async function scheduleAlarms() {
   const config = await loadConfig();
   await chrome.alarms.clearAll();
 
-  for (const time of config.scheduleTimes) {
-    const [hours, minutes] = time.split(":").map(Number);
-    const alarmName = `priceCheck_${time}`;
+  if (config.paranoidMode) {
+    // Paranoid mode: schedule next check at a random time
+    scheduleNextParanoidCheck(config.checksPerHour);
+  } else {
+    // Standard mode: fixed daily times
+    for (const time of config.scheduleTimes) {
+      const [hours, minutes] = time.split(":").map(Number);
+      const alarmName = `priceCheck_${time}`;
 
-    // Calculate next occurrence
-    const now = new Date();
-    const next = new Date();
-    next.setHours(hours, minutes, 0, 0);
-    if (next <= now) {
-      next.setDate(next.getDate() + 1);
+      const now = new Date();
+      const next = new Date();
+      next.setHours(hours, minutes, 0, 0);
+      if (next <= now) {
+        next.setDate(next.getDate() + 1);
+      }
+
+      chrome.alarms.create(alarmName, {
+        when: next.getTime(),
+        periodInMinutes: 24 * 60,
+      });
+
+      console.log(`Alarm scheduled: ${alarmName} at ${next.toLocaleString()}`);
     }
-
-    chrome.alarms.create(alarmName, {
-      when: next.getTime(),
-      periodInMinutes: 24 * 60, // repeat every 24 hours
-    });
-
-    console.log(`Alarm scheduled: ${alarmName} at ${next.toLocaleString()}`);
   }
+}
+
+function scheduleNextParanoidCheck(checksPerHour) {
+  const checks = Math.max(1, Math.min(checksPerHour, 12));
+  const intervalMinutes = 60 / checks;
+  // Random jitter: ±40% of the interval
+  const jitter = intervalMinutes * 0.4;
+  const delay = intervalMinutes + (Math.random() * jitter * 2 - jitter);
+  const delayMinutes = Math.max(1, delay);
+
+  chrome.alarms.create("paranoidCheck", {
+    delayInMinutes: delayMinutes,
+  });
+
+  console.log(`Paranoid mode: next check in ${delayMinutes.toFixed(1)} minutes`);
 }
 
 // --- Alarm Handler ---
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name.startsWith("priceCheck")) {
+  if (alarm.name === "paranoidCheck") {
+    console.log("Paranoid check fired");
+    await runPriceCheck();
+    // Schedule the next randomized check
+    const config = await loadConfig();
+    scheduleNextParanoidCheck(config.checksPerHour);
+  } else if (alarm.name.startsWith("priceCheck")) {
     console.log(`Alarm fired: ${alarm.name}`);
     await runPriceCheck();
   }
@@ -53,7 +80,7 @@ const pendingSearches = new Map(); // tabId -> resolve function
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "RUN_NOW") {
-    runPriceCheck().then(() => sendResponse({ success: true }));
+    runPriceCheck(/* forceSend */ true).then(() => sendResponse({ success: true }));
     return true; // async response
   }
 
@@ -70,7 +97,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // --- Price Check Logic ---
 
-async function runPriceCheck() {
+async function runPriceCheck(forceSend = false) {
   console.log("=== Starting price check ===");
   const config = await loadConfig();
 
@@ -100,8 +127,29 @@ async function runPriceCheck() {
     }
   }
 
-  // Send to Discord
-  await sendReports(config.webhookUrl, reports, config.botName);
+  // Build price snapshot for change detection
+  const newPrices = {};
+  for (const r of reports) {
+    newPrices[r.product.name] = r.lowestPrice;
+  }
+
+  // In paranoid mode, only send if prices changed
+  let shouldSend = true;
+  if (config.paranoidMode && !forceSend) {
+    const oldPrices = await getLastPrices();
+    if (oldPrices) {
+      shouldSend = JSON.stringify(oldPrices) !== JSON.stringify(newPrices);
+    }
+  }
+
+  if (shouldSend) {
+    await sendReports(config.webhookUrl, reports, config.botName);
+    console.log("Discord update sent");
+  } else {
+    console.log("Prices unchanged — skipping Discord update (paranoid mode)");
+  }
+
+  await setLastPrices(newPrices);
   await setLastRun(Date.now());
 
   console.log("=== Price check finished ===");
@@ -135,7 +183,7 @@ async function checkProduct(config, product) {
   // Source 2: Web search via background tab
   if (product.searchTerms) {
     try {
-      webPrices = await searchWebPrices(product.searchTerms, product.msrp, product.targetPrice);
+      webPrices = await searchWebPrices(product.searchTerms, product.name, product.msrp, product.targetPrice);
       for (const wp of webPrices) {
         console.log(`  Web: $${wp.price.toFixed(2)} at ${wp.source}`);
       }
@@ -176,7 +224,10 @@ async function checkProduct(config, product) {
 
 // --- Web Search via Background Tab ---
 
-async function searchWebPrices(searchTerms, msrp, targetPrice) {
+async function searchWebPrices(searchTerms, name, msrp, targetPrice) {
+  const productType = detectProductType(searchTerms, name);
+  console.log(`Detected product type: ${productType}`);
+
   const queries = buildQueries(searchTerms, msrp, targetPrice);
   const allResults = [];
 
@@ -192,7 +243,7 @@ async function searchWebPrices(searchTerms, msrp, targetPrice) {
   }
 
   // Process results: extract lowest prices per source
-  return processSearchResults(allResults, msrp);
+  return processSearchResults(allResults, msrp, productType, searchTerms);
 }
 
 function buildQueries(searchTerms, msrp, targetPrice) {
@@ -236,7 +287,13 @@ function runGoogleSearch(query) {
   });
 }
 
-function processSearchResults(results, msrp) {
+const SOLD_OUT_PHRASES = [
+  "sold out", "out of stock", "currently unavailable", "no longer available",
+  "not available", "unavailable", "backordered", "pre-order sold out",
+  "notify me when available", "notify when available", "email when available",
+];
+
+function processSearchResults(results, msrp, productType, searchTerms) {
   const SKIP_DOMAINS = new Set([
     "reddit.com", "youtube.com", "twitter.com", "x.com",
     "facebook.com", "wikipedia.org", "wiki.gg",
@@ -245,17 +302,28 @@ function processSearchResults(results, msrp) {
   const bySource = new Map();
 
   for (const result of results) {
+    let host;
     try {
-      const host = new URL(result.url).hostname.replace(/^www\./, "");
+      host = new URL(result.url).hostname.replace(/^www\./, "");
       if (SKIP_DOMAINS.has(host)) continue;
     } catch {
       continue;
     }
 
+    // Check if this result is about the right product type
+    if (!isResultRelevant(result.title || "", result.snippet || "", result.url, productType, searchTerms)) {
+      continue;
+    }
+
+    // Skip sold-out / out-of-stock items
+    const resultText = `${result.title || ""} ${result.snippet || ""}`.toLowerCase();
+    if (SOLD_OUT_PHRASES.some((phrase) => resultText.includes(phrase))) {
+      continue;
+    }
+
     for (const price of result.prices) {
-      // Filter unreasonable prices
-      if (msrp && price > msrp * 2) continue;
-      if (price < 1) continue;
+      // Filter prices that aren't reasonable for this product type
+      if (!isPriceReasonable(price, msrp, productType)) continue;
 
       const key = result.source.toLowerCase();
       if (!bySource.has(key) || price < bySource.get(key).price) {

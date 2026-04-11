@@ -2,8 +2,14 @@
 # Copy this file to config.yaml and edit to your needs.
 
 schedule:
-  times: ["09:00", "21:00"]   # Check times in 24h format
+  times: ["09:00", "21:00"]   # Check times in 24h format (ignored in paranoid mode)
   timezone: "US/Eastern"
+
+# Paranoid mode: randomizes check times and only notifies when prices change.
+# Helps avoid IP blocks from frequent automated searches.
+paranoid_mode:
+  enabled: false               # Set to true to enable
+  checks_per_hour: 5           # 1-12 checks per hour (times are randomized)
 
 bot_name: "Lorcana Price Tracker"
 
