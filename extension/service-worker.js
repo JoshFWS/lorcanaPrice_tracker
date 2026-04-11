@@ -1,4 +1,4 @@
-import { loadConfig, setLastRun } from "./lib/config.js";
+import { loadConfig, setLastRun, getLastPrices, setLastPrices } from "./lib/config.js";
 import { getPrice } from "./lib/tcgcsv.js";
 import { sendReports, formatMessage } from "./lib/discord.js";
 import { detectProductType, isResultRelevant, isPriceReasonable } from "./lib/product-types.js";
@@ -18,31 +18,57 @@ async function scheduleAlarms() {
   const config = await loadConfig();
   await chrome.alarms.clearAll();
 
-  for (const time of config.scheduleTimes) {
-    const [hours, minutes] = time.split(":").map(Number);
-    const alarmName = `priceCheck_${time}`;
+  if (config.paranoidMode) {
+    // Paranoid mode: schedule next check at a random time
+    scheduleNextParanoidCheck(config.checksPerHour);
+  } else {
+    // Standard mode: fixed daily times
+    for (const time of config.scheduleTimes) {
+      const [hours, minutes] = time.split(":").map(Number);
+      const alarmName = `priceCheck_${time}`;
 
-    // Calculate next occurrence
-    const now = new Date();
-    const next = new Date();
-    next.setHours(hours, minutes, 0, 0);
-    if (next <= now) {
-      next.setDate(next.getDate() + 1);
+      const now = new Date();
+      const next = new Date();
+      next.setHours(hours, minutes, 0, 0);
+      if (next <= now) {
+        next.setDate(next.getDate() + 1);
+      }
+
+      chrome.alarms.create(alarmName, {
+        when: next.getTime(),
+        periodInMinutes: 24 * 60,
+      });
+
+      console.log(`Alarm scheduled: ${alarmName} at ${next.toLocaleString()}`);
     }
-
-    chrome.alarms.create(alarmName, {
-      when: next.getTime(),
-      periodInMinutes: 24 * 60, // repeat every 24 hours
-    });
-
-    console.log(`Alarm scheduled: ${alarmName} at ${next.toLocaleString()}`);
   }
+}
+
+function scheduleNextParanoidCheck(checksPerHour) {
+  const checks = Math.max(1, Math.min(checksPerHour, 12));
+  const intervalMinutes = 60 / checks;
+  // Random jitter: ±40% of the interval
+  const jitter = intervalMinutes * 0.4;
+  const delay = intervalMinutes + (Math.random() * jitter * 2 - jitter);
+  const delayMinutes = Math.max(1, delay);
+
+  chrome.alarms.create("paranoidCheck", {
+    delayInMinutes: delayMinutes,
+  });
+
+  console.log(`Paranoid mode: next check in ${delayMinutes.toFixed(1)} minutes`);
 }
 
 // --- Alarm Handler ---
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name.startsWith("priceCheck")) {
+  if (alarm.name === "paranoidCheck") {
+    console.log("Paranoid check fired");
+    await runPriceCheck();
+    // Schedule the next randomized check
+    const config = await loadConfig();
+    scheduleNextParanoidCheck(config.checksPerHour);
+  } else if (alarm.name.startsWith("priceCheck")) {
     console.log(`Alarm fired: ${alarm.name}`);
     await runPriceCheck();
   }
@@ -54,7 +80,7 @@ const pendingSearches = new Map(); // tabId -> resolve function
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "RUN_NOW") {
-    runPriceCheck().then(() => sendResponse({ success: true }));
+    runPriceCheck(/* forceSend */ true).then(() => sendResponse({ success: true }));
     return true; // async response
   }
 
@@ -71,7 +97,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // --- Price Check Logic ---
 
-async function runPriceCheck() {
+async function runPriceCheck(forceSend = false) {
   console.log("=== Starting price check ===");
   const config = await loadConfig();
 
@@ -101,8 +127,29 @@ async function runPriceCheck() {
     }
   }
 
-  // Send to Discord
-  await sendReports(config.webhookUrl, reports, config.botName);
+  // Build price snapshot for change detection
+  const newPrices = {};
+  for (const r of reports) {
+    newPrices[r.product.name] = r.lowestPrice;
+  }
+
+  // In paranoid mode, only send if prices changed
+  let shouldSend = true;
+  if (config.paranoidMode && !forceSend) {
+    const oldPrices = await getLastPrices();
+    if (oldPrices) {
+      shouldSend = JSON.stringify(oldPrices) !== JSON.stringify(newPrices);
+    }
+  }
+
+  if (shouldSend) {
+    await sendReports(config.webhookUrl, reports, config.botName);
+    console.log("Discord update sent");
+  } else {
+    console.log("Prices unchanged — skipping Discord update (paranoid mode)");
+  }
+
+  await setLastPrices(newPrices);
   await setLastRun(Date.now());
 
   console.log("=== Price check finished ===");

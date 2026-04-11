@@ -19,9 +19,24 @@
 
     <section>
       <h2>Schedule</h2>
-      <div class="row">
+      <div class="row" id="scheduleRow">
         <input type="time" id="time1" value="09:00" />
         <input type="time" id="time2" value="21:00" />
+      </div>
+    </section>
+
+    <section>
+      <h2>Paranoid Mode</h2>
+      <div class="paranoid-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="paranoidMode" />
+          <span>Enable paranoid mode</span>
+        </label>
+      </div>
+      <div id="paranoidOptions" class="paranoid-options hidden">
+        <label>Checks per hour</label>
+        <input type="number" id="checksPerHour" min="1" max="12" value="1" />
+        <p class="hint">Randomizes check times to avoid IP blocks. Only sends Discord updates when prices change.</p>
       </div>
     </section>
 

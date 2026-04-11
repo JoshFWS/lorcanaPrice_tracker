@@ -16,7 +16,25 @@ function renderConfig() {
   document.getElementById("webhookUrl").value = config.webhookUrl || "";
   document.getElementById("time1").value = config.scheduleTimes[0] || "09:00";
   document.getElementById("time2").value = config.scheduleTimes[1] || "21:00";
+
+  // Paranoid mode
+  const paranoidCheckbox = document.getElementById("paranoidMode");
+  paranoidCheckbox.checked = config.paranoidMode || false;
+  document.getElementById("checksPerHour").value = config.checksPerHour || 1;
+  updateParanoidUI(paranoidCheckbox.checked);
+
+  paranoidCheckbox.addEventListener("change", (e) => {
+    updateParanoidUI(e.target.checked);
+  });
+
   renderProducts();
+}
+
+function updateParanoidUI(enabled) {
+  document.getElementById("paranoidOptions").classList.toggle("hidden", !enabled);
+  // Dim the fixed schedule when paranoid mode is on (it won't be used)
+  document.getElementById("scheduleRow").style.opacity = enabled ? "0.4" : "1";
+  document.getElementById("scheduleRow").style.pointerEvents = enabled ? "none" : "auto";
 }
 
 function renderProducts() {
@@ -115,6 +133,8 @@ async function handleSave() {
     document.getElementById("time1").value,
     document.getElementById("time2").value,
   ];
+  config.paranoidMode = document.getElementById("paranoidMode").checked;
+  config.checksPerHour = parseInt(document.getElementById("checksPerHour").value) || 1;
 
   await saveConfig(config);
   showMessage("Settings saved!", "success");

@@ -177,6 +177,47 @@ input:focus {
   color: #991b1b;
 }
 
+.paranoid-row {
+  margin-bottom: 8px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.paranoid-options {
+  margin-top: 8px;
+}
+
+.paranoid-options label {
+  font-size: 11px;
+  color: #6b7280;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.paranoid-options input {
+  width: 80px;
+}
+
+.hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
 .hidden {
   display: none;
 }
