@@ -1,6 +1,7 @@
 import { loadConfig, setLastRun } from "./lib/config.js";
 import { getPrice } from "./lib/tcgcsv.js";
 import { sendReports, formatMessage } from "./lib/discord.js";
+import { detectProductType, isResultRelevant, isPriceReasonable } from "./lib/product-types.js";
 
 // --- Alarm Setup ---
 
@@ -135,7 +136,7 @@ async function checkProduct(config, product) {
   // Source 2: Web search via background tab
   if (product.searchTerms) {
     try {
-      webPrices = await searchWebPrices(product.searchTerms, product.msrp, product.targetPrice);
+      webPrices = await searchWebPrices(product.searchTerms, product.name, product.msrp, product.targetPrice);
       for (const wp of webPrices) {
         console.log(`  Web: $${wp.price.toFixed(2)} at ${wp.source}`);
       }
@@ -176,7 +177,10 @@ async function checkProduct(config, product) {
 
 // --- Web Search via Background Tab ---
 
-async function searchWebPrices(searchTerms, msrp, targetPrice) {
+async function searchWebPrices(searchTerms, name, msrp, targetPrice) {
+  const productType = detectProductType(searchTerms, name);
+  console.log(`Detected product type: ${productType}`);
+
   const queries = buildQueries(searchTerms, msrp, targetPrice);
   const allResults = [];
 
@@ -192,7 +196,7 @@ async function searchWebPrices(searchTerms, msrp, targetPrice) {
   }
 
   // Process results: extract lowest prices per source
-  return processSearchResults(allResults, msrp);
+  return processSearchResults(allResults, msrp, productType, searchTerms);
 }
 
 function buildQueries(searchTerms, msrp, targetPrice) {
@@ -236,7 +240,7 @@ function runGoogleSearch(query) {
   });
 }
 
-function processSearchResults(results, msrp) {
+function processSearchResults(results, msrp, productType, searchTerms) {
   const SKIP_DOMAINS = new Set([
     "reddit.com", "youtube.com", "twitter.com", "x.com",
     "facebook.com", "wikipedia.org", "wiki.gg",
@@ -245,17 +249,22 @@ function processSearchResults(results, msrp) {
   const bySource = new Map();
 
   for (const result of results) {
+    let host;
     try {
-      const host = new URL(result.url).hostname.replace(/^www\./, "");
+      host = new URL(result.url).hostname.replace(/^www\./, "");
       if (SKIP_DOMAINS.has(host)) continue;
     } catch {
       continue;
     }
 
+    // Check if this result is about the right product type
+    if (!isResultRelevant(result.title || "", result.snippet || "", result.url, productType, searchTerms)) {
+      continue;
+    }
+
     for (const price of result.prices) {
-      // Filter unreasonable prices
-      if (msrp && price > msrp * 2) continue;
-      if (price < 1) continue;
+      // Filter prices that aren't reasonable for this product type
+      if (!isPriceReasonable(price, msrp, productType)) continue;
 
       const key = result.source.toLowerCase();
       if (!bySource.has(key) || price < bySource.get(key).price) {

@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from googlesearch import search
 
 from .models import WebPrice
+from .product_types import detect_product_type, is_result_relevant, is_price_reasonable
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ def search_web_prices(
     msrp: float | None = None,
     target_price: float | None = None,
     max_results: int = 3,
+    product_name: str = "",
 ) -> list[WebPrice]:
     """
     Search the web for lowest prices using Google search.
@@ -59,6 +61,9 @@ def search_web_prices(
 
     Returns up to max_results lowest unique prices found.
     """
+    product_type = detect_product_type(search_terms, product_name)
+    logger.info("Detected product type: %s", product_type)
+
     all_prices: list[WebPrice] = []
 
     year = datetime.now().year
@@ -69,7 +74,9 @@ def search_web_prices(
             logger.info("Searching: %s", query)
             results = search(query, num_results=8, advanced=True)
             for result in results:
-                extracted = _extract_prices_from_result(result, search_terms)
+                extracted = _extract_prices_from_result(
+                    result, search_terms, product_type, msrp,
+                )
                 all_prices.extend(extracted)
         except Exception as e:
             logger.warning("Search failed for '%s': %s", query, e)
@@ -80,7 +87,7 @@ def search_web_prices(
     unique = _deduplicate(all_prices)
 
     # Filter out unreasonable prices
-    unique = _filter_prices(unique, msrp)
+    unique = _filter_prices(unique, msrp, product_type)
 
     # Sort by price, return top N
     unique.sort(key=lambda wp: wp.price)
@@ -118,7 +125,12 @@ def _build_queries(
     return queries
 
 
-def _extract_prices_from_result(result, search_terms: str) -> list[WebPrice]:
+def _extract_prices_from_result(
+    result,
+    search_terms: str,
+    product_type: str = "unknown",
+    msrp: float | None = None,
+) -> list[WebPrice]:
     """Extract price(s) from a single Google search result."""
     url = result.url if hasattr(result, "url") else str(result)
     title = result.title if hasattr(result, "title") else ""
@@ -126,6 +138,10 @@ def _extract_prices_from_result(result, search_terms: str) -> list[WebPrice]:
 
     domain = _get_domain(url)
     if domain in SKIP_DOMAINS:
+        return []
+
+    # Check if this result is about the right product type
+    if not is_result_relevant(title, description, url, product_type, search_terms):
         return []
 
     # Combine title and description to search for prices
@@ -148,13 +164,17 @@ def _extract_prices_from_result(result, search_terms: str) -> list[WebPrice]:
         except ValueError:
             continue
 
-        # Skip very low prices (likely not the product) and very high ones
-        if amount < 1.00 or amount > 5000:
-            continue
-
         if amount in seen_amounts:
             continue
         seen_amounts.add(amount)
+
+        # Check if this price is reasonable for the product type
+        if not is_price_reasonable(amount, msrp, product_type):
+            logger.debug(
+                "Skipping unreasonable price $%.2f for %s from %s",
+                amount, product_type, source,
+            )
+            continue
 
         prices.append(WebPrice(
             price=amount,
@@ -197,12 +217,19 @@ def _deduplicate(prices: list[WebPrice]) -> list[WebPrice]:
     return list(by_source.values())
 
 
-def _filter_prices(prices: list[WebPrice], msrp: float | None) -> list[WebPrice]:
-    """Filter out prices that are clearly wrong."""
+def _filter_prices(
+    prices: list[WebPrice],
+    msrp: float | None,
+    product_type: str = "unknown",
+) -> list[WebPrice]:
+    """Filter out prices that are clearly wrong for this product type."""
     filtered = []
     for wp in prices:
-        # If we have MSRP, filter out prices more than 2x MSRP (likely wrong product)
-        if msrp and wp.price > msrp * 2.0:
+        if not is_price_reasonable(wp.price, msrp, product_type):
+            logger.debug(
+                "Filtering out $%.2f from %s (unreasonable for %s)",
+                wp.price, wp.source, product_type,
+            )
             continue
         filtered.append(wp)
     return filtered

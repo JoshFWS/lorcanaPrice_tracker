@@ -74,6 +74,7 @@ def _check_single_product(
                 msrp=product.msrp,
                 target_price=product.target_price,
                 max_results=3,
+                product_name=product.name,
             )
             for wp in web_prices:
                 logger.info("  Web: $%.2f at %s", wp.price, wp.source)
