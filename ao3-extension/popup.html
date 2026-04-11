@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="header-icon">A</div>
+        <h1>AO3 Work Tracker</h1>
+      </div>
+      <button id="settingsToggle" class="icon-btn" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+      <span id="statusText">Loading...</span>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tabs">
+      <button class="tab active" data-tab="works">Tracked Works</button>
+      <button class="tab" data-tab="searches">Search Alerts</button>
+    </div>
+
+    <!-- Tracked Works Tab -->
+    <div class="tab-content active" id="tab-works">
+      <div id="workList" class="card-list"></div>
+
+      <div class="add-row">
+        <input type="text" id="addWorkUrl" placeholder="Paste AO3 work URL..." />
+        <button id="addWorkBtn" class="btn-icon" title="Add work">+</button>
+      </div>
+    </div>
+
+    <!-- Search Alerts Tab -->
+    <div class="tab-content" id="tab-searches">
+      <div id="searchList" class="card-list"></div>
+
+      <button id="newSearchBtn" class="btn-secondary">+ New Search Alert</button>
+
+      <!-- New Search Form (hidden by default) -->
+      <div id="searchForm" class="search-form hidden">
+        <div class="form-group">
+          <label>Alert Name</label>
+          <input type="text" id="searchName" placeholder="e.g. New Dramione Fics" />
+        </div>
+
+        <div class="form-group">
+          <label>Categories</label>
+          <div class="pill-group" id="categoryPills">
+            <button class="pill-toggle" data-value="F/F">F/F</button>
+            <button class="pill-toggle" data-value="F/M">F/M</button>
+            <button class="pill-toggle" data-value="Gen">Gen</button>
+            <button class="pill-toggle" data-value="M/M">M/M</button>
+            <button class="pill-toggle" data-value="Multi">Multi</button>
+            <button class="pill-toggle" data-value="Other">Other</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Fandom</label>
+          <input type="text" id="searchFandom" placeholder="e.g. Harry Potter" />
+        </div>
+
+        <div class="form-group">
+          <label>Relationship</label>
+          <input type="text" id="searchRelationship" placeholder="e.g. Hermione Granger/Draco Malfoy" />
+        </div>
+
+        <div class="form-group">
+          <label>Characters</label>
+          <input type="text" id="searchCharacters" placeholder="e.g. Draco Malfoy" />
+        </div>
+
+        <div class="form-group">
+          <label>Additional Tags</label>
+          <input type="text" id="searchTags" placeholder="e.g. Slow Burn, Enemies to Lovers" />
+        </div>
+
+        <div class="form-group">
+          <label>Language</label>
+          <select id="searchLanguage">
+            <option value="">Any</option>
+            <option value="en">English</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="es">Spanish</option>
+            <option value="it">Italian</option>
+            <option value="ja">Japanese</option>
+            <option value="zh">Chinese</option>
+            <option value="ko">Korean</option>
+            <option value="ru">Russian</option>
+            <option value="pt">Portuguese</option>
+            <option value="pl">Polish</option>
+            <option value="nl">Dutch</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Min Words</label>
+            <input type="number" id="searchWordsMin" placeholder="0" />
+          </div>
+          <div class="form-group half">
+            <label>Max Words</label>
+            <input type="number" id="searchWordsMax" placeholder="Any" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Min Chapters</label>
+            <input type="number" id="searchChaptersMin" placeholder="0" />
+          </div>
+          <div class="form-group half">
+            <label>Max Chapters</label>
+            <input type="number" id="searchChaptersMax" placeholder="Any" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Min Kudos</label>
+            <input type="number" id="searchMinKudos" placeholder="0" />
+          </div>
+          <div class="form-group half">
+            <label>Min Hits</label>
+            <input type="number" id="searchMinHits" placeholder="0" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="toggle-label">
+            <span>Complete works only</span>
+            <div class="toggle-switch">
+              <input type="checkbox" id="searchComplete" />
+              <span class="toggle-slider"></span>
+            </div>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button id="cancelSearchBtn" class="btn-ghost">Cancel</button>
+          <button id="addSearchBtn" class="btn-primary btn-sm">Add Alert</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Panel (hidden by default) -->
+    <div id="settingsPanel" class="settings-panel hidden">
+      <h3>Settings</h3>
+
+      <div class="form-group">
+        <label>Discord Webhook URL</label>
+        <input type="text" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." />
+      </div>
+
+      <div class="form-group">
+        <label class="toggle-label">
+          <span>Paranoid Mode</span>
+          <div class="toggle-switch">
+            <input type="checkbox" id="paranoidMode" />
+            <span class="toggle-slider"></span>
+          </div>
+        </label>
+        <p class="hint">Randomizes check timing to avoid IP bans. Recommended for AO3.</p>
+      </div>
+
+      <div class="form-group" id="checksPerHourGroup">
+        <label>Checks per hour: <strong id="checksPerHourValue">2</strong></label>
+        <input type="range" id="checksPerHour" min="1" max="6" value="2" />
+        <p class="hint">Higher = more frequent but riskier. Recommended: 1-2.</p>
+      </div>
+
+      <button id="saveSettings" class="btn-primary">Save Settings</button>
+    </div>
+
+    <!-- Check Now Button -->
+    <div class="actions">
+      <button id="checkNow" class="btn-accent">Check Now</button>
+    </div>
+
+    <!-- Toast Message -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
