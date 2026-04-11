@@ -5,6 +5,9 @@
   const params = new URLSearchParams(window.location.search);
   if (!params.has("_ao3t")) return;
 
+  // Only run on individual work pages (/works/DIGITS), not search pages (/works/search)
+  if (!window.location.pathname.match(/\/works\/\d+/)) return;
+
   // Check for rate limit page
   if (isRateLimitPage()) {
     chrome.runtime.sendMessage({

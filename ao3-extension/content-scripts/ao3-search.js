@@ -62,10 +62,10 @@
       });
     }
 
-    // Total works count from heading (e.g., "1523 Found")
+    // Total works count from heading (e.g., "1523 Found" or "1523 Works found")
     const headingEl = document.querySelector("h3.heading");
     const headingText = headingEl?.textContent || "";
-    const totalMatch = headingText.match(/([\d,]+)\s+Found/i);
+    const totalMatch = headingText.match(/([\d,]+)\s+(?:Works?\s+)?Found/i);
     const totalWorks = totalMatch
       ? parseInt(totalMatch[1].replace(/,/g, ""), 10)
       : works.length;

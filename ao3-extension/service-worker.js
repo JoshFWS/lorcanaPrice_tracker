@@ -326,7 +326,8 @@ async function tryFallbackScript(tabId, expectedType, resolve) {
 // --- Search URL Builder ---
 
 function buildSearchUrl(filters) {
-  const base = "https://archiveofourown.org/works";
+  // Must use /works/search (not /works) to support advanced filters like kudos, hits, word count
+  const base = "https://archiveofourown.org/works/search";
   const params = new URLSearchParams();
   params.set("utf8", "\u2713");
   params.set("work_search[sort_column]", filters.sortBy || "revised_at");
@@ -359,20 +360,20 @@ function buildSearchUrl(filters) {
     params.set("work_search[language_id]", filters.language);
   }
 
-  if (filters.wordCountMin) {
-    params.set("work_search[words_from]", filters.wordCountMin);
+  // Word count uses range format: "1000-", "-5000", or "1000-5000"
+  if (filters.wordCountMin || filters.wordCountMax) {
+    const min = filters.wordCountMin || "";
+    const max = filters.wordCountMax || "";
+    params.set("work_search[word_count]", `${min}-${max}`);
   }
 
-  if (filters.wordCountMax) {
-    params.set("work_search[words_to]", filters.wordCountMax);
-  }
-
+  // Kudos and hits require ">" prefix for minimum threshold
   if (filters.minKudos) {
-    params.set("work_search[kudos_count]", filters.minKudos);
+    params.set("work_search[kudos_count]", `>${filters.minKudos}`);
   }
 
   if (filters.minHits) {
-    params.set("work_search[hits]", filters.minHits);
+    params.set("work_search[hits]", `>${filters.minHits}`);
   }
 
   if (filters.complete === true) {
