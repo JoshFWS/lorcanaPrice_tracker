@@ -1,0 +1,52 @@
+# Lorcana Price Tracker Configuration
+# Copy this file to config.yaml and edit to your needs.
+
+schedule:
+  times: ["09:00", "21:00"]   # Check times in 24h format
+  timezone: "US/Eastern"
+
+bot_name: "Lorcana Price Tracker"
+
+# Lorcana category on TCGPlayer (don't change this)
+category_id: 71
+
+products:
+  # --- Sealed Products ---
+  # product_id and group_id are from TCGPlayer — find them at tcgcsv.com
+  # search_terms are used for web search price discovery (no retailer list needed)
+
+  - name: "Winterspell Booster Box"
+    product_id: 664819
+    group_id: 24500
+    msrp: 143.76
+    target_price: 110.00
+    alert_threshold_pct: 0.80
+    search_terms: "Disney Lorcana Winterspell booster box display 24 pack"
+
+  - name: "Winterspell Illumineer's Trove"
+    product_id: 664826
+    group_id: 24500
+    msrp: 49.99
+    target_price: 38.00
+    alert_threshold_pct: 0.80
+    search_terms: "Disney Lorcana Winterspell Illumineer's Trove"
+
+  # --- Individual Cards ---
+  # variant: Normal | Holofoil | Cold Foil (defaults to Normal)
+
+  - name: "Scar - Mastermind"
+    product_id: 485360
+    group_id: 22937
+    variant: "Normal"
+    target_price: 8.00
+    search_terms: "Lorcana Scar Mastermind card"
+
+  # --- Search-only product (no TCGPlayer IDs needed) ---
+  # If you don't know the product_id, just provide name, group_id, and search_terms.
+  # The tool will fuzzy-match the name against products in that set.
+
+  # - name: "Elsa - Spirit of Winter"
+  #   group_id: 22937
+  #   variant: "Enchanted"
+  #   target_price: 45.00
+  #   search_terms: "Lorcana Elsa Spirit of Winter Enchanted"
