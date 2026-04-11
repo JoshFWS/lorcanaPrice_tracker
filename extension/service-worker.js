@@ -240,6 +240,12 @@ function runGoogleSearch(query) {
   });
 }
 
+const SOLD_OUT_PHRASES = [
+  "sold out", "out of stock", "currently unavailable", "no longer available",
+  "not available", "unavailable", "backordered", "pre-order sold out",
+  "notify me when available", "notify when available", "email when available",
+];
+
 function processSearchResults(results, msrp, productType, searchTerms) {
   const SKIP_DOMAINS = new Set([
     "reddit.com", "youtube.com", "twitter.com", "x.com",
@@ -259,6 +265,12 @@ function processSearchResults(results, msrp, productType, searchTerms) {
 
     // Check if this result is about the right product type
     if (!isResultRelevant(result.title || "", result.snippet || "", result.url, productType, searchTerms)) {
+      continue;
+    }
+
+    // Skip sold-out / out-of-stock items
+    const resultText = `${result.title || ""} ${result.snippet || ""}`.toLowerCase();
+    if (SOLD_OUT_PHRASES.some((phrase) => resultText.includes(phrase))) {
       continue;
     }
 

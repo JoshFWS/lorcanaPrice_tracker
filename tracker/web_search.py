@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 # Delay between Google searches to avoid rate limiting
 SEARCH_DELAY_SECONDS = 2.0
 
+# Phrases that indicate an item is sold out / unavailable
+SOLD_OUT_PHRASES = [
+    "sold out", "out of stock", "currently unavailable", "no longer available",
+    "not available", "unavailable", "backordered", "pre-order sold out",
+    "notify me when available", "notify when available", "email when available",
+]
+
 # Domains to skip (not real retail prices)
 SKIP_DOMAINS = {
     "reddit.com", "youtube.com", "twitter.com", "x.com", "facebook.com",
@@ -146,6 +153,13 @@ def _extract_prices_from_result(
 
     # Combine title and description to search for prices
     text = f"{title} {description}"
+
+    # Skip sold-out / out-of-stock items
+    text_lower = text.lower()
+    for phrase in SOLD_OUT_PHRASES:
+        if phrase in text_lower:
+            logger.debug("Skipping sold-out result: %s", title[:80])
+            return []
 
     # Find all dollar amounts
     price_pattern = r'\$(\d{1,4}(?:\.\d{2})?)'
