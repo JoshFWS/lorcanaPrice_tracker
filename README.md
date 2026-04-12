@@ -100,7 +100,7 @@ The extensions in this repo are **Chrome-only** and are loaded as unpacked exten
 If you haven't already, get the files onto your machine:
 
 ```bash
-git clone https://github.com/Josh_FWS/lorcanaPrice_tracker.git
+git clone https://github.com/JoshFWS/lorcanaPrice_tracker.git
 ```
 
 Or download the ZIP from GitHub and unzip it anywhere convenient (e.g. your Desktop or Documents folder). Note the folder path — you'll need it in Step 3.
