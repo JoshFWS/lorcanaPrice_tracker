@@ -10,7 +10,44 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("save").addEventListener("click", handleSave);
   document.getElementById("runNow").addEventListener("click", handleRunNow);
   document.getElementById("addProduct").addEventListener("click", addEmptyProduct);
+
+  setupAuthorCursorEffect();
 });
+
+function setupAuthorCursorEffect() {
+  const link = document.getElementById("authorLink");
+  const cursor = document.getElementById("customCursor");
+  if (!link || !cursor) return;
+
+  const PROXIMITY_THRESHOLD = 100;
+
+  document.addEventListener("mousemove", (e) => {
+    const rect = link.getBoundingClientRect();
+    const linkCenterX = rect.left + rect.width / 2;
+    const linkCenterY = rect.top + rect.height / 2;
+    const dx = e.clientX - linkCenterX;
+    const dy = e.clientY - linkCenterY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < PROXIMITY_THRESHOLD) {
+      const t = 1 - distance / PROXIMITY_THRESHOLD;
+      const scale = 1 + 2 * t;
+      cursor.style.display = "block";
+      cursor.style.left = e.clientX + "px";
+      cursor.style.top = e.clientY + "px";
+      cursor.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      document.body.style.cursor = "none";
+    } else {
+      cursor.style.display = "none";
+      document.body.style.cursor = "";
+    }
+  });
+
+  document.addEventListener("mouseleave", () => {
+    cursor.style.display = "none";
+    document.body.style.cursor = "";
+  });
+}
 
 function renderConfig() {
   document.getElementById("webhookUrl").value = config.webhookUrl || "";

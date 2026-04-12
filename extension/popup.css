@@ -221,3 +221,35 @@ input:focus {
 .hidden {
   display: none;
 }
+
+.author-credit {
+  text-align: center;
+  padding: 10px 0 4px;
+  margin-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.author-link {
+  font-size: 11px;
+  color: #9ca3af;
+  text-decoration: none;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  transition: color 0.15s;
+}
+
+.author-link:hover {
+  color: #1d4ed8;
+}
+
+.custom-cursor {
+  position: fixed;
+  width: 14px;
+  height: 14px;
+  background: #1a1a1a;
+  border-radius: 50%;
+  pointer-events: none;
+  display: none;
+  transform: translate(-50%, -50%) scale(1);
+  z-index: 9999;
+}
