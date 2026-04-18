@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "AO3 Work Tracker",
-  "version": "1.0",
-  "description": "Track AO3 works and searches with Discord webhook notifications",
-  "permissions": ["alarms", "storage", "tabs", "scripting"],
+  "version": "2.0",
+  "description": "Get Discord notifications when tracked AO3 works are updated",
+  "permissions": ["alarms", "storage"],
   "host_permissions": [
     "https://archiveofourown.org/*",
     "https://discord.com/*"
@@ -12,21 +12,6 @@
     "service_worker": "service-worker.js",
     "type": "module"
   },
-  "content_scripts": [
-    {
-      "matches": ["https://archiveofourown.org/works/*"],
-      "js": ["content-scripts/ao3-work.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://archiveofourown.org/works?*",
-        "https://archiveofourown.org/works/search*"
-      ],
-      "js": ["content-scripts/ao3-search.js"],
-      "run_at": "document_idle"
-    }
-  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
