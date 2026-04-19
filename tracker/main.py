@@ -117,10 +117,18 @@ def main():
     if config.paranoid_mode:
         _run_paranoid_loop(config)
     else:
-        # Standard fixed-time scheduling
-        for t in config.schedule_times:
-            schedule.every().day.at(t).do(run_price_check, config)
-            logger.info("Scheduled price check at %s %s", t, config.schedule_timezone)
+        if config.schedule_interval_hours:
+            schedule.every(config.schedule_interval_hours).hours.do(
+                run_price_check, config
+            )
+            logger.info(
+                "Scheduled price check every %d hour(s)",
+                config.schedule_interval_hours,
+            )
+        else:
+            for t in config.schedule_times:
+                schedule.every().day.at(t).do(run_price_check, config)
+                logger.info("Scheduled price check at %s %s", t, config.schedule_timezone)
 
         # Run immediately on startup
         logger.info("Running initial price check...")

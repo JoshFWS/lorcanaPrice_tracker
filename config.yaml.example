@@ -2,7 +2,10 @@
 # Copy this file to config.yaml and edit to your needs.
 
 schedule:
-  times: ["09:00", "21:00"]   # Check times in 24h format (ignored in paranoid mode)
+  # Default (when neither key is set) is interval_hours: 3 — checks every 3 hours.
+  # interval_hours takes precedence over times if both are set.
+  interval_hours: 3             # Run every N hours
+  # times: ["09:00", "21:00"]   # ...or pick explicit 24h clock times
   timezone: "US/Eastern"
 
 # Paranoid mode: randomizes check times and only notifies when prices change.

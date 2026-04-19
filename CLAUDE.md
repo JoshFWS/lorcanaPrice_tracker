@@ -15,7 +15,7 @@ python -m tracker --once
 # Run continuous scheduled mode
 python -m tracker
 
-# Run unit tests
+# Run unit tests (plain scripts, no pytest/framework configured — invoke directly)
 python test_product_types.py
 
 # Test web search functionality
@@ -31,9 +31,10 @@ The backend lives entirely in `tracker/`. Data flows:
 
 1. `__main__.py` → `main.py` — entry point; handles scheduling (fixed-time via `schedule` library or randomized "paranoid" mode)
 2. `main.py` calls `price_checker.py` per product
-3. `price_checker.py` coordinates two data sources:
+3. `price_checker.py` coordinates three data sources:
    - `tcgcsv_client.py` — fetches TCGPlayer prices from tcgcsv.com (REST API, cached per `group_id`)
-   - `web_search.py` — Google search with regex price extraction from snippets
+   - `web_search.py` → `search_web_prices()` — generic Google search with regex price extraction
+   - `web_search.py` → `search_priority_retailers()` — site-scoped searches for each entry in `PRIORITY_RETAILERS` (currently `gamenerdz.com`, `doubleinfinitygaming.com`); results are **always** included in the report with status `available` / `sold_out` / `not_found` / `error`
 4. Results are combined into `ProductReport` (defined in `models.py`)
 5. `discord.py` formats `ProductReport` into Discord embeds and POSTs to webhook
 
@@ -42,6 +43,13 @@ The backend lives entirely in `tracker/`. Data flows:
 - `is_alert`: `lowest_price < msrp × alert_threshold_pct` (default 80%)
 
 **Paranoid mode** randomizes check intervals (±40% jitter) and suppresses duplicate alerts when prices haven't changed.
+
+**Scheduling modes** (non-paranoid, in `main.py`):
+- `schedule.interval_hours: N` — `schedule.every(N).hours.do(...)` (default: `3` when neither key is set)
+- `schedule.times: [...]` — fixed 24h clock times via `schedule.every().day.at(t).do(...)`
+- `interval_hours` takes precedence over `times` when both are set.
+
+**Category ID:** Lorcana is TCGPlayer category `71`. This is hardcoded as `LORCANA_CATEGORY_ID` in `tcgcsv_client.py` and defaulted in `config.py` — override via `category_id` in `config.yaml` to support other TCGs.
 
 ## Key Modules
 
@@ -63,9 +71,11 @@ Two files required (see `.env.example` and `config.yaml.example`):
 
 ## Chrome Extensions
 
-Two MV3 Chrome extensions live alongside the backend:
+Two MV3 Chrome extensions live alongside the backend. Both use the Chrome Alarms API for scheduling, Chrome Storage API for persisted settings, and a service worker (`service-worker.js`) as the background entry point. Extensions are loaded unpacked in Chrome developer mode — no build step required.
 
-- **`extension/`** — Lorcana price tracker popup that runs Google searches and reads prices; uses Chrome Alarms API for scheduling and Chrome Storage API for persisting settings
-- **`ao3-extension/`** — AO3 fanfiction work tracker with Discord webhook notifications; content scripts (`ao3-work.js`, `ao3-search.js`) watch AO3 pages
+- **`extension/`** — Lorcana price tracker. Registers `content-script.js` on `https://www.google.com/search*` to scrape prices off a Google results page opened in a hidden tab. Shared logic lives in `lib/{config,discord,product-types,tcgcsv}.js` — mirrors of the Python modules.
+- **`ao3-extension/`** — AO3 work tracker. **No content scripts**; the service worker fetches AO3 pages directly on an alarm schedule. Shared logic in `lib/{ao3-parser,config,discord,scheduler}.js`, UI in `popup.{html,js,css}`.
 
-Extensions are loaded unpacked in Chrome developer mode — no build step required.
+## Repo layout gotcha
+
+There is a nested `lorcanaPrice_tracker/` directory at the repo root that is a **stale full copy** of the project (own `.git`, `tracker/`, extensions, tests). It is not the source of truth — edits there do not affect the running code. Always work at the repo root unless you have a specific reason to touch the copy.

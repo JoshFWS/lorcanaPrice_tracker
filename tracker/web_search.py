@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from googlesearch import search
 
-from .models import WebPrice
+from .models import PriorityRetailerResult, WebPrice
 from .product_types import detect_product_type, is_result_relevant, is_price_reasonable
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,14 @@ RETAILER_NAMES = {
     "dacardworld.com": "DA Card World",
     "safarizone.co": "Safari Zone",
     "starcitygames.com": "Star City Games",
+    "doubleinfinitygaming.com": "Double Infinity Gaming",
 }
+
+# Retailers that must always appear in the report, checked via site:-scoped search.
+PRIORITY_RETAILERS: list[tuple[str, str]] = [
+    ("gamenerdz.com", "GameNerdz"),
+    ("doubleinfinitygaming.com", "Double Infinity Gaming"),
+]
 
 
 def search_web_prices(
@@ -247,3 +254,100 @@ def _filter_prices(
             continue
         filtered.append(wp)
     return filtered
+
+
+def search_priority_retailers(
+    search_terms: str,
+    msrp: float | None = None,
+    product_name: str = "",
+) -> list[PriorityRetailerResult]:
+    """Run site-scoped searches against each priority retailer.
+
+    For every entry in PRIORITY_RETAILERS, runs `site:<domain> "<search_terms>"`
+    and returns a PriorityRetailerResult indicating availability. Every retailer
+    is represented in the returned list (status="not_found" if nothing matched,
+    "sold_out" if all candidates were sold out, "error" if the search failed).
+    """
+    product_type = detect_product_type(search_terms, product_name)
+    results: list[PriorityRetailerResult] = []
+
+    for domain, display_name in PRIORITY_RETAILERS:
+        results.append(
+            _search_single_priority_retailer(
+                domain=domain,
+                display_name=display_name,
+                search_terms=search_terms,
+                product_type=product_type,
+                msrp=msrp,
+            )
+        )
+        time.sleep(SEARCH_DELAY_SECONDS)
+
+    return results
+
+
+def _search_single_priority_retailer(
+    domain: str,
+    display_name: str,
+    search_terms: str,
+    product_type: str,
+    msrp: float | None,
+) -> PriorityRetailerResult:
+    query = f'site:{domain} "{search_terms}"'
+    logger.info("Priority search: %s", query)
+
+    try:
+        raw_results = list(search(query, num_results=5, advanced=True))
+    except Exception as e:
+        logger.warning("Priority search failed for %s: %s", domain, e)
+        return PriorityRetailerResult(
+            retailer=display_name, domain=domain,
+            status="error", message=str(e),
+        )
+
+    best_price: float | None = None
+    best_url: str | None = None
+    any_sold_out = False
+    any_matched = False
+
+    for result in raw_results:
+        url = result.url if hasattr(result, "url") else str(result)
+        title = result.title if hasattr(result, "title") else ""
+        description = result.description if hasattr(result, "description") else ""
+
+        if _get_domain(url) != domain:
+            continue
+        if not is_result_relevant(title, description, url, product_type, search_terms):
+            continue
+
+        any_matched = True
+        text = f"{title} {description}"
+        text_lower = text.lower()
+
+        if any(p in text_lower for p in SOLD_OUT_PHRASES):
+            any_sold_out = True
+            continue
+
+        for match in re.findall(r'\$(\d{1,4}(?:\.\d{2})?)', text):
+            try:
+                amount = float(match)
+            except ValueError:
+                continue
+            if not is_price_reasonable(amount, msrp, product_type):
+                continue
+            if best_price is None or amount < best_price:
+                best_price = amount
+                best_url = url
+
+    if best_price is not None:
+        return PriorityRetailerResult(
+            retailer=display_name, domain=domain,
+            status="available", price=best_price, url=best_url,
+        )
+    if any_matched and any_sold_out:
+        return PriorityRetailerResult(
+            retailer=display_name, domain=domain, status="sold_out",
+        )
+    return PriorityRetailerResult(
+        retailer=display_name, domain=domain, status="not_found",
+    )

@@ -3,7 +3,7 @@ from datetime import datetime
 
 from .models import AppConfig, ProductConfig, ProductReport
 from .tcgcsv_client import TcgCsvClient
-from .web_search import search_web_prices
+from .web_search import search_priority_retailers, search_web_prices
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,7 @@ def _check_single_product(
     errors = []
     tcgplayer_price = None
     web_prices = []
+    priority_results = []
 
     # Source 1: TCGPlayer via tcgcsv.com
     if product.group_id is not None:
@@ -82,10 +83,28 @@ def _check_single_product(
             logger.error("  Web search failed: %s", e)
             errors.append(f"Web search error: {e}")
 
+    # Source 3: Priority retailers (always reported, even when absent/sold-out)
+    if product.search_terms:
+        try:
+            priority_results = search_priority_retailers(
+                search_terms=product.search_terms,
+                msrp=product.msrp,
+                product_name=product.name,
+            )
+            for pr in priority_results:
+                if pr.status == "available":
+                    logger.info("  Priority %s: $%.2f", pr.retailer, pr.price)
+                else:
+                    logger.info("  Priority %s: %s", pr.retailer, pr.status)
+        except Exception as e:
+            logger.error("  Priority retailer search failed: %s", e)
+            errors.append(f"Priority search error: {e}")
+
     return ProductReport(
         product=product,
         tcgplayer=tcgplayer_price,
         web_prices=web_prices,
+        priority_results=priority_results,
         checked_at=datetime.now(),
         errors=errors,
     )

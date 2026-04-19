@@ -24,6 +24,7 @@ class AppConfig:
     schedule_times: list[str]
     schedule_timezone: str
     products: list[ProductConfig]
+    schedule_interval_hours: int | None = None
     paranoid_mode: bool = False
     checks_per_hour: int = 5
 
@@ -51,11 +52,27 @@ class WebPrice:
 
 
 @dataclass
+class PriorityRetailerResult:
+    """Result of a site-scoped search at a priority retailer.
+
+    `status` is one of: "available", "sold_out", "not_found", "error".
+    `price`/`url` are only set when status == "available".
+    """
+    retailer: str
+    domain: str
+    status: str
+    price: float | None = None
+    url: str | None = None
+    message: str = ""
+
+
+@dataclass
 class ProductReport:
     """Combined price report for a single tracked product."""
     product: ProductConfig
     tcgplayer: TCGPlayerPrice | None = None
     web_prices: list[WebPrice] = field(default_factory=list)
+    priority_results: list[PriorityRetailerResult] = field(default_factory=list)
     checked_at: datetime = field(default_factory=datetime.now)
     errors: list[str] = field(default_factory=list)
 
@@ -67,6 +84,9 @@ class ProductReport:
             prices.append(self.tcgplayer.low_price)
         for wp in self.web_prices:
             prices.append(wp.price)
+        for pr in self.priority_results:
+            if pr.status == "available" and pr.price is not None:
+                prices.append(pr.price)
         return min(prices) if prices else None
 
     @property

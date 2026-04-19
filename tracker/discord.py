@@ -71,6 +71,23 @@ def _format_message(report: ProductReport) -> str:
             lines.append(f"{alert_prefix}**${wp.price:.2f}** - [{wp.source}]({wp.url})")
         lines.append("")
 
+    # Priority retailers section — always shown, one line per retailer
+    if report.priority_results:
+        lines.append("📌 **Priority Retailers**")
+        for pr in report.priority_results:
+            if pr.status == "available" and pr.price is not None:
+                alert_prefix = "🔥 " if _price_triggers_alert(pr.price, report) else ""
+                link = f"[{pr.retailer}]({pr.url})" if pr.url else pr.retailer
+                lines.append(f"{alert_prefix}{link}: **${pr.price:.2f}**")
+            elif pr.status == "sold_out":
+                lines.append(f"{pr.retailer}: Sold out")
+            elif pr.status == "error":
+                msg = pr.message or "search error"
+                lines.append(f"{pr.retailer}: ⚠️ {msg}")
+            else:  # not_found
+                lines.append(f"{pr.retailer}: Not listed")
+        lines.append("")
+
     # Footer: target and MSRP
     footer_parts = []
     if report.product.target_price is not None:

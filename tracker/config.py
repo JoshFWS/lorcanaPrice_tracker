@@ -62,12 +62,23 @@ def load_config() -> AppConfig:
 
     paranoid = raw.get("paranoid_mode", {})
 
+    # Scheduling: prefer explicit interval_hours, then explicit times, else
+    # default to interval_hours=3 (every 3 hours).
+    interval_hours = schedule.get("interval_hours")
+    times = schedule.get("times")
+    if interval_hours is None and times is None:
+        interval_hours = 3
+        times = []
+    elif times is None:
+        times = []
+
     return AppConfig(
         webhook_url=webhook_url,
         bot_name=raw.get("bot_name", "Lorcana Price Tracker"),
         category_id=raw.get("category_id", 71),
-        schedule_times=schedule.get("times", ["09:00", "21:00"]),
+        schedule_times=times,
         schedule_timezone=schedule.get("timezone", "US/Eastern"),
+        schedule_interval_hours=interval_hours,
         products=products,
         paranoid_mode=paranoid.get("enabled", False),
         checks_per_hour=paranoid.get("checks_per_hour", 5),
