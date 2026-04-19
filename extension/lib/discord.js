@@ -56,6 +56,25 @@ export function formatMessage(report) {
     lines.push("");
   }
 
+  // Priority retailers — always shown, one line per retailer with status
+  if (report.priorityResults && report.priorityResults.length > 0) {
+    lines.push("📌 **Priority Retailers**");
+    for (const pr of report.priorityResults) {
+      if (pr.status === "available" && pr.price != null) {
+        const alertPrefix = priceTriggers(pr.price, report) ? "🔥 " : "";
+        const link = pr.url ? `[${pr.retailer}](${pr.url})` : pr.retailer;
+        lines.push(`${alertPrefix}${link}: **$${pr.price.toFixed(2)}**`);
+      } else if (pr.status === "sold_out") {
+        lines.push(`${pr.retailer}: Sold out`);
+      } else if (pr.status === "error") {
+        lines.push(`${pr.retailer}: ⚠️ ${pr.message || "search error"}`);
+      } else {
+        lines.push(`${pr.retailer}: Not listed`);
+      }
+    }
+    lines.push("");
+  }
+
   // Footer
   const footer = [];
   if (report.product.targetPrice != null) {

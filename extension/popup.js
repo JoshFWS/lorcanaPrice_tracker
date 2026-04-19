@@ -51,6 +51,8 @@ function setupAuthorCursorEffect() {
 
 function renderConfig() {
   document.getElementById("webhookUrl").value = config.webhookUrl || "";
+  const intervalInput = document.getElementById("scheduleIntervalHours");
+  intervalInput.value = config.scheduleIntervalHours ?? 3;
   document.getElementById("time1").value = config.scheduleTimes[0] || "09:00";
   document.getElementById("time2").value = config.scheduleTimes[1] || "21:00";
 
@@ -58,20 +60,25 @@ function renderConfig() {
   const paranoidCheckbox = document.getElementById("paranoidMode");
   paranoidCheckbox.checked = config.paranoidMode || false;
   document.getElementById("checksPerHour").value = config.checksPerHour || 1;
-  updateParanoidUI(paranoidCheckbox.checked);
+  updateScheduleUI();
 
-  paranoidCheckbox.addEventListener("change", (e) => {
-    updateParanoidUI(e.target.checked);
-  });
+  paranoidCheckbox.addEventListener("change", updateScheduleUI);
+  intervalInput.addEventListener("input", updateScheduleUI);
 
   renderProducts();
 }
 
-function updateParanoidUI(enabled) {
-  document.getElementById("paranoidOptions").classList.toggle("hidden", !enabled);
-  // Dim the fixed schedule when paranoid mode is on (it won't be used)
-  document.getElementById("scheduleRow").style.opacity = enabled ? "0.4" : "1";
-  document.getElementById("scheduleRow").style.pointerEvents = enabled ? "none" : "auto";
+function updateScheduleUI() {
+  const paranoid = document.getElementById("paranoidMode").checked;
+  const interval = Number(document.getElementById("scheduleIntervalHours").value) || 0;
+
+  document.getElementById("paranoidOptions").classList.toggle("hidden", !paranoid);
+
+  // Fixed-time row is only used when both paranoid mode is off AND interval is 0
+  const fixedTimesActive = !paranoid && interval <= 0;
+  const scheduleRow = document.getElementById("scheduleRow");
+  scheduleRow.style.opacity = fixedTimesActive ? "1" : "0.4";
+  scheduleRow.style.pointerEvents = fixedTimesActive ? "auto" : "none";
 }
 
 function renderProducts() {
@@ -166,6 +173,8 @@ function addEmptyProduct() {
 async function handleSave() {
   // Read current values from UI
   config.webhookUrl = document.getElementById("webhookUrl").value.trim();
+  config.scheduleIntervalHours =
+    parseInt(document.getElementById("scheduleIntervalHours").value) || 0;
   config.scheduleTimes = [
     document.getElementById("time1").value,
     document.getElementById("time2").value,

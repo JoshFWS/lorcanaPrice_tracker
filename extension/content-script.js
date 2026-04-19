@@ -52,15 +52,16 @@
         }
       }
 
-      if (prices.length > 0) {
-        results.push({
-          url,
-          title,
-          snippet: snippet.slice(0, 200),
-          prices,
-          source: getDomainName(url),
-        });
-      }
+      // Emit every result — callers that only care about prices can filter
+      // on `prices.length`, but priority-retailer searches need to see all
+      // results (including sold-out and price-less listings) to report status.
+      results.push({
+        url,
+        title,
+        snippet: snippet.slice(0, 200),
+        prices,
+        source: getDomainName(url),
+      });
     }
 
     return results;
@@ -85,6 +86,7 @@
         "zulusgames.com": "Zulu's Games",
         "starcitygames.com": "Star City Games",
         "dacardworld.com": "DA Card World",
+        "doubleinfinitygaming.com": "Double Infinity Gaming",
       };
 
       return NAMES[host] || host.replace(/\.\w+$/, "").replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());

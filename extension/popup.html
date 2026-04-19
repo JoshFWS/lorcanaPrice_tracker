@@ -19,6 +19,11 @@
 
     <section>
       <h2>Schedule</h2>
+      <div class="interval-row">
+        <label>Interval (hours)</label>
+        <input type="number" id="scheduleIntervalHours" min="0" max="168" step="1" value="3" />
+        <p class="hint">Checks every N hours. Set to 0 to use fixed times below instead.</p>
+      </div>
       <div class="row" id="scheduleRow">
         <input type="time" id="time1" value="09:00" />
         <input type="time" id="time2" value="21:00" />

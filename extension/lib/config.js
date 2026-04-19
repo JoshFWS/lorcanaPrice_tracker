@@ -3,6 +3,9 @@ const DEFAULT_CONFIG = {
   webhookUrl: "",
   botName: "Lorcana Price Tracker",
   categoryId: 71,
+  // Scheduling: scheduleIntervalHours takes precedence over scheduleTimes when > 0.
+  // Default: every 3 hours.
+  scheduleIntervalHours: 3,
   scheduleTimes: ["09:00", "21:00"],
   paranoidMode: false,
   checksPerHour: 5,

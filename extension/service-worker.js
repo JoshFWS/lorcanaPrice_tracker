@@ -21,26 +21,39 @@ async function scheduleAlarms() {
   if (config.paranoidMode) {
     // Paranoid mode: schedule next check at a random time
     scheduleNextParanoidCheck(config.checksPerHour);
-  } else {
-    // Standard mode: fixed daily times
-    for (const time of config.scheduleTimes) {
-      const [hours, minutes] = time.split(":").map(Number);
-      const alarmName = `priceCheck_${time}`;
+    return;
+  }
 
-      const now = new Date();
-      const next = new Date();
-      next.setHours(hours, minutes, 0, 0);
-      if (next <= now) {
-        next.setDate(next.getDate() + 1);
-      }
+  // Interval mode takes precedence over fixed times when > 0
+  const intervalHours = Number(config.scheduleIntervalHours) || 0;
+  if (intervalHours > 0) {
+    const periodInMinutes = intervalHours * 60;
+    chrome.alarms.create("priceCheck_interval", {
+      delayInMinutes: periodInMinutes,
+      periodInMinutes,
+    });
+    console.log(`Alarm scheduled: every ${intervalHours} hour(s)`);
+    return;
+  }
 
-      chrome.alarms.create(alarmName, {
-        when: next.getTime(),
-        periodInMinutes: 24 * 60,
-      });
+  // Fixed daily times
+  for (const time of config.scheduleTimes) {
+    const [hours, minutes] = time.split(":").map(Number);
+    const alarmName = `priceCheck_${time}`;
 
-      console.log(`Alarm scheduled: ${alarmName} at ${next.toLocaleString()}`);
+    const now = new Date();
+    const next = new Date();
+    next.setHours(hours, minutes, 0, 0);
+    if (next <= now) {
+      next.setDate(next.getDate() + 1);
     }
+
+    chrome.alarms.create(alarmName, {
+      when: next.getTime(),
+      periodInMinutes: 24 * 60,
+    });
+
+    console.log(`Alarm scheduled: ${alarmName} at ${next.toLocaleString()}`);
   }
 }
 
@@ -192,10 +205,30 @@ async function checkProduct(config, product) {
     }
   }
 
-  // Calculate lowest price
+  // Source 3: Priority retailers (always reported)
+  let priorityResults = [];
+  if (product.searchTerms) {
+    try {
+      priorityResults = await searchPriorityRetailers(product.searchTerms, product.name, product.msrp);
+      for (const pr of priorityResults) {
+        if (pr.status === "available") {
+          console.log(`  Priority ${pr.retailer}: $${pr.price.toFixed(2)}`);
+        } else {
+          console.log(`  Priority ${pr.retailer}: ${pr.status}`);
+        }
+      }
+    } catch (e) {
+      errors.push(`Priority search error: ${e.message}`);
+    }
+  }
+
+  // Calculate lowest price (including any available priority retailer prices)
   const allPrices = [];
   if (tcgplayer && tcgplayer.lowPrice != null) allPrices.push(tcgplayer.lowPrice);
   for (const wp of webPrices) allPrices.push(wp.price);
+  for (const pr of priorityResults) {
+    if (pr.status === "available" && pr.price != null) allPrices.push(pr.price);
+  }
   const lowestPrice = allPrices.length > 0 ? Math.min(...allPrices) : null;
 
   // Alert logic
@@ -214,6 +247,7 @@ async function checkProduct(config, product) {
     product,
     tcgplayer,
     webPrices,
+    priorityResults,
     checkedAt: Date.now(),
     lowestPrice,
     isAlert,
@@ -341,4 +375,105 @@ function processSearchResults(results, msrp, productType, searchTerms) {
   return [...bySource.values()]
     .sort((a, b) => a.price - b.price)
     .slice(0, 3);
+}
+
+// --- Priority Retailer Search ---
+
+const PRIORITY_RETAILERS = [
+  { domain: "gamenerdz.com", name: "GameNerdz" },
+  { domain: "doubleinfinitygaming.com", name: "Double Infinity Gaming" },
+];
+
+async function searchPriorityRetailers(searchTerms, productName, msrp) {
+  const productType = detectProductType(searchTerms, productName);
+  const results = [];
+
+  for (const retailer of PRIORITY_RETAILERS) {
+    results.push(await searchSinglePriorityRetailer(retailer, searchTerms, productType, msrp));
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+
+  return results;
+}
+
+async function searchSinglePriorityRetailer(retailer, searchTerms, productType, msrp) {
+  const query = `site:${retailer.domain} "${searchTerms}"`;
+  console.log(`Priority search: ${query}`);
+
+  let rawResults;
+  try {
+    rawResults = await runGoogleSearch(query);
+  } catch (e) {
+    return {
+      retailer: retailer.name,
+      domain: retailer.domain,
+      status: "error",
+      price: null,
+      url: null,
+      message: e.message || String(e),
+    };
+  }
+
+  let bestPrice = null;
+  let bestUrl = null;
+  let anyMatched = false;
+  let anySoldOut = false;
+
+  for (const result of rawResults) {
+    let host;
+    try {
+      host = new URL(result.url).hostname.replace(/^www\./, "");
+    } catch {
+      continue;
+    }
+    if (host !== retailer.domain) continue;
+
+    if (!isResultRelevant(result.title || "", result.snippet || "", result.url, productType, searchTerms)) {
+      continue;
+    }
+
+    anyMatched = true;
+    const text = `${result.title || ""} ${result.snippet || ""}`.toLowerCase();
+    if (SOLD_OUT_PHRASES.some((p) => text.includes(p))) {
+      anySoldOut = true;
+      continue;
+    }
+
+    for (const price of result.prices || []) {
+      if (!isPriceReasonable(price, msrp, productType)) continue;
+      if (bestPrice === null || price < bestPrice) {
+        bestPrice = price;
+        bestUrl = result.url;
+      }
+    }
+  }
+
+  if (bestPrice !== null) {
+    return {
+      retailer: retailer.name,
+      domain: retailer.domain,
+      status: "available",
+      price: bestPrice,
+      url: bestUrl,
+      message: "",
+    };
+  }
+  if (anyMatched && anySoldOut) {
+    return {
+      retailer: retailer.name,
+      domain: retailer.domain,
+      status: "sold_out",
+      price: null,
+      url: null,
+      message: "",
+    };
+  }
+  return {
+    retailer: retailer.name,
+    domain: retailer.domain,
+    status: "not_found",
+    price: null,
+    url: null,
+    message: "",
+  };
 }

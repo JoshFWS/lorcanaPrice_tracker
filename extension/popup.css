@@ -196,18 +196,22 @@ input:focus {
   cursor: pointer;
 }
 
-.paranoid-options {
+.paranoid-options,
+.interval-row {
   margin-top: 8px;
+  margin-bottom: 8px;
 }
 
-.paranoid-options label {
+.paranoid-options label,
+.interval-row label {
   font-size: 11px;
   color: #6b7280;
   display: block;
   margin-bottom: 2px;
 }
 
-.paranoid-options input {
+.paranoid-options input,
+.interval-row input {
   width: 80px;
 }
 
